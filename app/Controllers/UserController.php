@@ -16,9 +16,11 @@ class UserController extends BaseController
 
     public function login()
     {
+        // Redirect if already logged in
         if (!empty($_SESSION['user_id'])) {
             return redirect()->to('/');
         }
+        // Working with form data if POST request
         if ($this->request->getPost()) {
             $data = $this->request->getPost();
             $validation = Services::validation();
@@ -28,13 +30,16 @@ class UserController extends BaseController
                     'email'    => 'required',
                 ]
             );
+            // Checking reCAPTCHA
             if (empty($data['g-recaptcha-response'])) {
                 $validation->setError('g-recaptcha-response', 'Please activate recaptcha');
                 return $this->renderPage('login', $validation->listErrors());
             }
+            // Data validation
             if ($validation->withRequest($this->request)->run()) {
                 unset($data['g-recaptcha-response']);
                 $result = User::checkUser($data);
+                // Logging in if user with such data exists
                 if ($result) {
                     $_SESSION['user_id'] = $result;
                     return redirect()->to('/');
@@ -43,18 +48,22 @@ class UserController extends BaseController
                     return $this->renderPage('login', $validation->listErrors());
                 }
             } else {
+                // Data validation fails, return with validation errors
                 return $this->renderPage('login', $validation->listErrors());
             }
         } else {
+            // Render page if GET request
             return $this->renderPage('login');
         }
     }
 
     public function registration()
     {
+        // Redirect if already logged in
         if (!empty($_SESSION['user_id'])) {
             return redirect()->to('/');
         }
+        // Working with form data if POST request
         if ($this->request->getPost()) {
             $data = $this->request->getPost();
             $validation = Services::validation();
@@ -65,11 +74,14 @@ class UserController extends BaseController
                     'email'    => 'required|is_unique[users.email,id,{id}]',
                 ]
             );
+            // Checking reCAPTCHA
             if (empty($data['g-recaptcha-response'])) {
                 $validation->setError('g-recaptcha-response', 'Please activate recaptcha');
                 return $this->renderPage('registration', $validation->listErrors());
             }
+            // Validating data
             if ($validation->withRequest($this->request)->run()) {
+                // Checking email with debounce.io
                 $curl = curl_init();
 
                 curl_setopt_array(
@@ -93,11 +105,12 @@ class UserController extends BaseController
                 $err = curl_error($curl);
 
                 curl_close($curl);
-
+                // If request fails return error
                 if ($err) {
                     $validation->setError('email', 'Checking email error');
                     return $this->renderPage('registration', $validation->listErrors());
                 } elseif ($response->debounce->code != '5') {
+                    // If email is valid and acceptable
                     $validation->setError('email', 'Your email is invalid or not acceptable');
                     return $this->renderPage('registration', $validation->listErrors());
                 }
@@ -106,22 +119,27 @@ class UserController extends BaseController
                 $data['password'] = password_hash($data['password'], PASSWORD_BCRYPT);
                 $result = User::registerUser($data);
                 if ($result) {
+                    // If successful inserting, logging in
                     $_SESSION['user_id'] = $result;
                     return redirect()->to('/');
                 } else {
+                    // If inserting in database fails, return error
                     $validation->setError('email', 'Database insert error');
                     return $this->renderPage('registration', $validation->listErrors());
                 }
             } else {
+                // Render page with validation errors
                 return $this->renderPage('registration', $validation->listErrors());
             }
         } else {
+            // Render page if GET request
             return $this->renderPage('registration');
         }
     }
 
     public function logout()
     {
+        // Deleting user's data from session
         session_unset();
         return redirect()->to('/registration');
     }
